@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Final Exam Flashcards</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+      color: #a78bfa;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 0.88rem;
+      color: #888;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    /* Unit filter pills */
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 24px;
+      max-width: 600px;
+    }
+
+    .pill {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      background: #2d2d50;
+      color: #aaa;
+      transition: all 0.18s;
+    }
+
+    .pill:hover { background: #3d3d6b; color: #eee; }
+
+    .pill.active {
+      background: #4f46e5;
+      color: #fff;
+      border-color: #7c3aed;
+    }
+
+    .pill.quickset {
+      background: #1e1a00;
+      color: #fbbf24;
+      border-color: #b45309;
+    }
+
+    .pill.quickset.active {
+      background: #92400e;
+      color: #fef3c7;
+      border-color: #fbbf24;
+    }
+
+    /* Card */
+    .card-container {
+      perspective: 1200px;
+      width: 460px;
+      max-width: 92vw;
+      height: 250px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.5s ease;
+    }
+
+    .card.flipped { transform: rotateY(180deg); }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 32px;
+      text-align: center;
+    }
+
+    .card-front {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      box-shadow: 0 8px 32px rgba(79,70,229,0.4);
+    }
+
+    .card-back {
+      background: linear-gradient(135deg, #0f766e, #0891b2);
+      transform: rotateY(180deg);
+      box-shadow: 0 8px 32px rgba(8,145,178,0.4);
+    }
+
+    .card-unit-tag {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      opacity: 0.6;
+      margin-bottom: 6px;
+    }
+
+    .card-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+
+    .card-term {
+      font-size: 1.45rem;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .card-def {
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 0.73rem;
+      opacity: 0.5;
+    }
+
+    /* Know / Learn buttons */
+    .know-btns {
+      display: none;
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .know-btns.visible { display: flex; }
+
+    .btn-know {
+      background: #14532d;
+      color: #4ade80;
+      border: 1.5px solid #22c55e;
+      border-radius: 12px;
+      padding: 10px 22px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-know:hover { background: #166534; transform: scale(1.04); }
+
+    .btn-learn {
+      background: #431407;
+      color: #fb923c;
+      border: 1.5px solid #f97316;
+      border-radius: 12px;
+      padding: 10px 22px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-learn:hover { background: #7c2d12; transform: scale(1.04); }
+
+    /* Score row */
+    .score-row {
+      display: flex;
+      gap: 24px;
+      margin-top: 16px;
+      font-size: 0.88rem;
+    }
+
+    .score-know { color: #4ade80; }
+    .score-learn { color: #fb923c; }
+
+    /* Nav controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-top: 18px;
+    }
+
+    button {
+      background: #2d2d50;
+      color: #eee;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 22px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #3d3d6b; }
+    button:disabled { opacity: 0.3; cursor: default; }
+
+    .counter {
+      font-size: 0.95rem;
+      color: #a78bfa;
+      min-width: 70px;
+      text-align: center;
+    }
+
+    .bottom-btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .shuffle-btn {
+      background: transparent;
+      border: 1px solid #4f46e5;
+      color: #a78bfa;
+      font-size: 0.8rem;
+      padding: 7px 16px;
+      border-radius: 10px;
+    }
+
+    .shuffle-btn:hover { background: #1e1b4b; }
+
+    /* Progress dots */
+    .progress {
+      display: flex;
+      gap: 5px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 460px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #2d2d50;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .dot.know { background: #22c55e; }
+    .dot.learn { background: #f97316; }
+    .dot.current { background: #a78bfa; }
+
+    /* Done screen */
+    .done-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 14px;
+      max-width: 460px;
+    }
+
+    .done-screen.visible { display: flex; }
+
+    .done-title { font-size: 1.8rem; font-weight: 700; color: #a78bfa; }
+    .done-stats { font-size: 1.1rem; line-height: 2; }
+
+    .restart-btn {
+      background: #4f46e5;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-size: 1rem;
+      cursor: pointer;
+      color: #fff;
+    }
+
+    .restart-btn:hover { background: #4338ca; }
+
+    .study-again-btn {
+      background: #431407;
+      border: 1.5px solid #f97316;
+      color: #fb923c;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .study-again-btn:hover { background: #7c2d12; }
+  </style>
+</head>
+<body>
+
+  <h1>Final Exam Review</h1>
+  <p class="subtitle">Click a card to flip &bull; Mark yourself &bull; Study what you need</p>
+
+  <div class="filters" id="filters"></div>
+
+  <div id="main">
+    <div class="card-container" onclick="flipCard()">
+      <div class="card" id="card">
+        <div class="card-face card-front">
+          <div class="card-unit-tag" id="unitTag"></div>
+          <div class="card-label">Term</div>
+          <div class="card-term" id="term"></div>
+          <div class="hint">tap to reveal</div>
+        </div>
+        <div class="card-face card-back">
+          <div class="card-label">Definition</div>
+          <div class="card-def" id="def"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="know-btns" id="knowBtns">
+      <button class="btn-learn" onclick="markCard(false)">&#x2715; Still learning</button>
+      <button class="btn-know" onclick="markCard(true)">&#x2713; Know it</button>
+    </div>
+
+    <div class="score-row">
+      <span class="score-know">&#10003; Know it: <span id="knowCount">0</span></span>
+      <span class="score-learn">&#x2715; Still learning: <span id="learnCount">0</span></span>
+    </div>
+
+    <div class="controls">
+      <button id="prevBtn" onclick="navigate(-1)">&#8592; Prev</button>
+      <span class="counter" id="counter"></span>
+      <button id="nextBtn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+
+    <div class="bottom-btns">
+      <button class="shuffle-btn" onclick="shuffle()">&#x1F500; Shuffle</button>
+    </div>
+
+    <div class="progress" id="progress"></div>
+  </div>
+
+  <div class="done-screen" id="doneScreen">
+    <div class="done-title">Nice work!</div>
+    <div class="done-stats" id="doneStats"></div>
+    <button class="restart-btn" onclick="restart(false)">&#x1F504; Restart all cards</button>
+    <button class="study-again-btn" onclick="restart(true)">&#x1F4DA; Study &ldquo;Still learning&rdquo; again</button>
+  </div>
+
+  <script>
+    const QUICK_SET = [
+      { unit: "⭐ Quick Set", term: "Hobbes", def: "Humans are naturally selfish" },
+      { unit: "⭐ Quick Set", term: "Locke", def: "Natural rights — government must have consent of the governed" },
+      { unit: "⭐ Quick Set", term: "Rousseau", def: "People are naturally good" },
+      { unit: "⭐ Quick Set", term: "Montesquieu", def: "Government should have separation of powers" },
+      { unit: "⭐ Quick Set", term: "Beccaria", def: "Against torture and cruel punishments" },
+      { unit: "⭐ Quick Set", term: "Adam Smith", def: "Father of capitalism and the free market" },
+      { unit: "⭐ Quick Set", term: "The Social Contract", def: "Agreement between people and the government — people give up some freedom in exchange for protection" },
+    ];
+
+    const ALL_CARDS = [
+      // ── UNIT 1: Romans ──────────────────────────────────────────────
+      { unit: "Unit 1: Romans", term: "Roman Empire at its peak", def: "Home to 5 million people — one of the largest empires in history" },
+      { unit: "Unit 1: Romans", term: "Patricians vs. Plebeians", def: "Patricians were high-ranking nobles; Plebeians were the poorer common people" },
+      { unit: "Unit 1: Romans", term: "Roman style of control", def: "Military force and law — used to intimidate and maintain order" },
+      { unit: "Unit 1: Romans", term: "Why was Rome successful in expansion?", def: "They had strong, well-organized armies" },
+      { unit: "Unit 1: Romans", term: "Bread and Circuses", def: "Free food and entertainment to keep the people distracted from political problems" },
+      { unit: "Unit 1: Romans", term: "Roman Colosseum & Circus Maximus", def: "Public venues where Romans watched games and entertainment" },
+      { unit: "Unit 1: Romans", term: "How did Christianity spread in Rome?", def: "It gave the common people something to believe in and follow" },
+      { unit: "Unit 1: Romans", term: "Constantine's role with Christianity", def: "Made Christianity legal throughout the Roman Empire" },
+      { unit: "Unit 1: Romans", term: "Why did Rome fall?", def: "Economic collapse and invasions from outside forces" },
+      { unit: "Unit 1: Romans", term: "Pax Romana", def: "200 years of Roman peace" },
+      // ── UNIT 1: Byzantine ───────────────────────────────────────────
+      { unit: "Unit 1: Byzantine Empire", term: "Justinian", def: "Byzantine emperor who reconquered Africa, Italy, and Spain to restore the old Roman Empire" },
+      { unit: "Unit 1: Byzantine Empire", term: "Justinian Code", def: "A organized system of Roman laws" },
+      { unit: "Unit 1: Byzantine Empire", term: "Life in the Byzantine Empire", def: "Wealthy trade society with Roman and Christian culture; valued economics, religion, and art" },
+      { unit: "Unit 1: Byzantine Empire", term: "What caused the Byzantine Empire to fall?", def: "Wars and internal corruption" },
+      { unit: "Unit 1: Byzantine Empire", term: "Who overtook the Byzantine Empire?", def: "The Ottoman Turks in 1453" },
+      { unit: "Unit 1: Byzantine Empire", term: "Roman Catholic vs. Eastern Orthodox Church", def: "Catholic Church led by the Pope; Eastern Orthodox led by the Patriarch (Constantine)" },
+      { unit: "Unit 1: Byzantine Empire", term: "Why did the Christian Church split?", def: "Disagreement over authority" },
+      { unit: "Unit 1: Byzantine Empire", term: "Excommunication", def: "Being banned/removed from the church — both Catholic and Orthodox used it against each other" },
+      // ── UNIT 1: Russia ──────────────────────────────────────────────
+      { unit: "Unit 1: Russian Empire", term: "Russian Empire geography", def: "Harsh winters and flat stretches of land" },
+      { unit: "Unit 1: Russian Empire", term: "Dnieper, Don, and Volga rivers", def: "Connected Russian cities and greatly influenced trade" },
+      { unit: "Unit 1: Russian Empire", term: "Capital of Russia moved to Kiev (880 AD)", def: "Kiev became the capital of the Russian Empire in 880 AD" },
+      { unit: "Unit 1: Russian Empire", term: "Vladimir's role in Russia", def: "Converted Russia to Eastern Orthodox Christianity" },
+      { unit: "Unit 1: Russian Empire", term: "Who conquered the Russians in the 1200s?", def: "The Mongols" },
+      { unit: "Unit 1: Russian Empire", term: "Mongol tactics to maintain control", def: "Burned cities and used fear and terror" },
+      { unit: "Unit 1: Russian Empire", term: "Mongol demands", def: "Taxes, loyalty, and total obedience" },
+      { unit: "Unit 1: Russian Empire", term: "Ivan III", def: "Russian leader who freed Russia from Mongol control" },
+
+      // ── UNIT 2: Middle Ages ─────────────────────────────────────────
+      { unit: "Unit 2: Middle Ages", term: "The Franks", def: "Germanic tribe that dominated Western Europe after Rome fell" },
+      { unit: "Unit 2: Middle Ages", term: "Impact of outside invasions on Western Europe", def: "Disrupted trade and made conditions worse for everyone" },
+      { unit: "Unit 2: Middle Ages", term: "Role of the Church (400–600 AD)", def: "Provided social services to the people" },
+      { unit: "Unit 2: Middle Ages", term: "Pope Gregory I", def: "Expanded the Church's power across Europe" },
+      { unit: "Unit 2: Middle Ages", term: "Pope Leo III", def: "Crowned Charlemagne as emperor, increasing the Church's political power" },
+      { unit: "Unit 2: Middle Ages", term: "Feudalism", def: "System where kings gave land to lords in exchange for military service" },
+      { unit: "Unit 2: Middle Ages", term: "Clovis", def: "First Frankish king to convert to Christianity" },
+      { unit: "Unit 2: Middle Ages", term: "Serfs", def: "Peasants who were legally bound to the land" },
+      { unit: "Unit 2: Middle Ages", term: "Fief", def: "A plot of land given in exchange for military service" },
+      { unit: "Unit 2: Middle Ages", term: "Holy Roman Empire", def: "Began with the crowning of Charlemagne" },
+      { unit: "Unit 2: Middle Ages", term: "Code of Chivalry", def: "A knight's code requiring loyalty, honor, and bravery" },
+      { unit: "Unit 2: Middle Ages", term: "What caused population growth in the later Middle Ages?", def: "Better farming techniques" },
+      { unit: "Unit 2: Middle Ages", term: "2/3 Farming System", def: "Two fields farmed, one left empty to restore the soil" },
+      { unit: "Unit 2: Middle Ages", term: "Commercial Revolution", def: "A period of growth in trade and the use of money" },
+      { unit: "Unit 2: Middle Ages", term: "Guilds", def: "Organizations of skilled craftsmen who set standards and prices" },
+      { unit: "Unit 2: Middle Ages", term: "King Henry II", def: "Strengthened England's legal system by creating common law" },
+      { unit: "Unit 2: Middle Ages", term: "Magna Carta", def: "Document that limited the king's power — a key step toward limited government" },
+      { unit: "Unit 2: Middle Ages", term: "Hundred Years' War", def: "England vs. France over the French throne" },
+      { unit: "Unit 2: Middle Ages", term: "William the Conqueror", def: "Norman king who invaded and conquered England in 1066" },
+      { unit: "Unit 2: Middle Ages", term: "Joan of Arc", def: "French peasant girl who became a national hero during the Hundred Years' War" },
+      { unit: "Unit 2: Middle Ages", term: "John Wycliffe", def: "Translated the Bible into English and criticized the Church" },
+      { unit: "Unit 2: Middle Ages", term: "Primary cause of the Black Death", def: "Bubonic plague" },
+      { unit: "Unit 2: Middle Ages", term: "Black Death's effect on the Catholic Church", def: "People lost faith when the Church couldn't stop the plague" },
+      { unit: "Unit 2: Middle Ages", term: "Trade routes and the Black Death", def: "Merchants carried the disease along trade routes, spreading it rapidly" },
+      { unit: "Unit 2: Middle Ages", term: "Great Schism", def: "Period when 3 popes were declared in power at the same time" },
+      { unit: "Unit 2: Middle Ages", term: "Western Schism", def: "Caused by disagreement over who the true pope was" },
+      { unit: "Unit 2: Middle Ages", term: "Lord", def: "A noble who owned land and gave it to knights in exchange for military service" },
+      { unit: "Unit 2: Middle Ages", term: "Manor", def: "The lord's estate — the center of feudal life" },
+      { unit: "Unit 2: Middle Ages", term: "Tithe", def: "A 10% tax paid to the Church" },
+      { unit: "Unit 2: Middle Ages", term: "Who called for the Crusades?", def: "Pope Urban II" },
+      { unit: "Unit 2: Middle Ages", term: "Impact of the 4th Crusade", def: "Weakened the Byzantine Empire" },
+
+      // ── UNIT 3: Renaissance ─────────────────────────────────────────
+      { unit: "Unit 3: Renaissance", term: "Renaissance", def: "Rebirth of art and learning; took place from the 1300s to the 1600s" },
+      { unit: "Unit 3: Renaissance", term: "Humanism", def: "Focus on human potential and achievement, not just religion" },
+      { unit: "Unit 3: Renaissance", term: "Humanists", def: "Scholars who studied classical Greek and Roman texts" },
+      { unit: "Unit 3: Renaissance", term: "Erasmus", def: "Wrote In Praise of Folly — mocked Church corruption and ignorance" },
+      { unit: "Unit 3: Renaissance", term: "Leonardo da Vinci's works", def: "Mona Lisa and The Last Supper" },
+      { unit: "Unit 3: Renaissance", term: "Renaissance Man", def: "A person skilled in many different areas" },
+      { unit: "Unit 3: Renaissance", term: "Why did the Renaissance start in Italy?", def: "Wealthy city-states with lots of trade activity" },
+      { unit: "Unit 3: Renaissance", term: "Michelangelo's works", def: "Sistine Chapel ceiling and the statue of David" },
+      { unit: "Unit 3: Renaissance", term: "Raphael's works", def: "School of Athens" },
+      { unit: "Unit 3: Renaissance", term: "Shakespeare", def: "Great playwright — wrote Romeo and Juliet and many others" },
+      { unit: "Unit 3: Renaissance", term: "Middle Ages vs. Renaissance: Role of the Church", def: "Middle Ages: central to all life. Renaissance: still important but less dominant" },
+      { unit: "Unit 3: Renaissance", term: "Middle Ages vs. Renaissance: Artwork", def: "Middle Ages: flat, religious. Renaissance: realistic, focused on humans" },
+      { unit: "Unit 3: Renaissance", term: "Middle Ages vs. Renaissance: Focus of life", def: "Middle Ages: afterlife and religion. Renaissance: individual achievement and this life" },
+      { unit: "Unit 3: Renaissance", term: "Printing Press importance", def: "Spread ideas and information rapidly to large numbers of people" },
+      { unit: "Unit 3: Renaissance", term: "Johann Gutenberg", def: "Invented the printing press" },
+      { unit: "Unit 3: Renaissance", term: "Patrons of the Arts", def: "Wealthy individuals who funded artists and their work" },
+
+      // ── UNIT 3: Reformation ─────────────────────────────────────────
+      { unit: "Unit 3: Reformation", term: "Martin Luther", def: "German priest who challenged the Catholic Church and started the Reformation" },
+      { unit: "Unit 3: Reformation", term: "The Reformation", def: "A movement to reform and challenge the Catholic Church" },
+      { unit: "Unit 3: Reformation", term: "95 Theses", def: "Luther's list of arguments against the Church, especially against indulgences" },
+      { unit: "Unit 3: Reformation", term: "Luther's beliefs", def: "Salvation through faith alone — not by buying indulgences" },
+      { unit: "Unit 3: Reformation", term: "John Calvin", def: "Protestant reformer who believed in predestination" },
+      { unit: "Unit 3: Reformation", term: "Predestination", def: "God decides who is saved at birth" },
+      { unit: "Unit 3: Reformation", term: "Indulgences", def: "Payments to the Church to reduce punishment for sins" },
+      { unit: "Unit 3: Reformation", term: "Counter Reformation", def: "The Catholic Church's effort to correct its own corruption" },
+      { unit: "Unit 3: Reformation", term: "Impact of the Reformation on the Church", def: "Broke the unity of Christianity, created Protestant denominations, weakened papal power" },
+
+      // ── UNIT 3: Exploration ─────────────────────────────────────────
+      { unit: "Unit 3: Age of Exploration", term: "The 3 G's (Age of Exploration)", def: "Gold, Glory, and God — the motivations for European exploration" },
+      { unit: "Unit 3: Age of Exploration", term: "Spice Trade's impact", def: "Motivated Europeans to find new sea routes to Asia" },
+      { unit: "Unit 3: Age of Exploration", term: "Columbus's first interactions with natives", def: "Initially peaceful, then led to trade and further exploration" },
+      { unit: "Unit 3: Age of Exploration", term: "Columbian Exchange", def: "Transfer of plants, animals, and diseases between the Old and New Worlds" },
+      { unit: "Unit 3: Age of Exploration", term: "Triangular Trade", def: "Trade system connecting Europe, Africa, and the Americas" },
+      { unit: "Unit 3: Age of Exploration", term: "Atlantic Slave Trade", def: "Forced transportation of millions of Africans to work as enslaved people" },
+      { unit: "Unit 3: Age of Exploration", term: "RACED", def: "Reconnaissance, Assets, Christianity, Empire building, Dominance — reasons for exploration" },
+      { unit: "Unit 3: Age of Exploration", term: "Which country was first and most impactful in colonizing the Americas?", def: "Spain" },
+      { unit: "Unit 3: Age of Exploration", term: "Mercantilism", def: "Economic theory that colonies exist to provide wealth to the mother country" },
+      { unit: "Unit 3: Age of Exploration", term: "Hernán Cortés", def: "Spanish conquistador who conquered the Aztecs" },
+      { unit: "Unit 3: Age of Exploration", term: "Francisco Pizarro", def: "Spanish conquistador who conquered the Incas" },
+      { unit: "Unit 3: Age of Exploration", term: "Montezuma II", def: "Aztec emperor who was defeated by Cortés" },
+      { unit: "Unit 3: Age of Exploration", term: "Atahualpa", def: "Inca emperor who was defeated by Pizarro" },
+      { unit: "Unit 3: Age of Exploration", term: "Which country had the best interactions with natives?", def: "France" },
+
+      // ── UNIT 4: Absolutism ──────────────────────────────────────────
+      { unit: "Unit 4: Absolutism", term: "Absolute Power", def: "A ruler has total control over the people with no limits" },
+      { unit: "Unit 4: Absolutism", term: "Characteristics of absolute monarchs", def: "Large armies, strong central power, and control of the economy" },
+      { unit: "Unit 4: Absolutism", term: "How did the Reformation lead to absolute monarchs?", def: "Religious wars made people want strong rulers for stability" },
+      { unit: "Unit 4: Absolutism", term: "Divine Right of Kings", def: "Belief that God gave the king his power, justifying absolute rule" },
+      { unit: "Unit 4: Absolutism", term: "Centralized Government", def: "All power flows from one central authority" },
+      { unit: "Unit 4: Absolutism", term: "Louis XIV", def: "Absolute monarch of France" },
+      { unit: "Unit 4: Absolutism", term: "Elizabeth I", def: "Queen of England who strengthened Anglican culture" },
+      { unit: "Unit 4: Absolutism", term: "Peter the Great", def: "Absolute monarch of Russia who Westernized the country" },
+      { unit: "Unit 4: Absolutism", term: "Philip II", def: "Absolute monarch of Spain" },
+      { unit: "Unit 4: Absolutism", term: "Limited Monarchy", def: "A monarchy where the king's power is restricted by laws" },
+      { unit: "Unit 4: Absolutism", term: "Westernization", def: "Peter the Great modernized Russia by adopting Western laws, customs, dress, and technology" },
+
+      // ── UNIT 5: Scientific Revolution ───────────────────────────────
+      { unit: "Unit 5: Scientific Revolution", term: "Francis Bacon", def: "Developed the scientific method based on observation and experimentation" },
+      { unit: "Unit 5: Scientific Revolution", term: "René Descartes", def: "\"I think, therefore I am\" — emphasized reason as the basis for knowledge" },
+      { unit: "Unit 5: Scientific Revolution", term: "Isaac Newton", def: "Discovered the laws of gravity and motion" },
+      { unit: "Unit 5: Scientific Revolution", term: "Galileo", def: "Used the telescope to observe the sky and support the heliocentric model" },
+      { unit: "Unit 5: Scientific Revolution", term: "Copernicus", def: "First proposed the heliocentric theory" },
+      { unit: "Unit 5: Scientific Revolution", term: "Heliocentric Theory", def: "The Earth and planets revolve around the Sun" },
+      { unit: "Unit 5: Scientific Revolution", term: "Scientific Method", def: "Observation → Hypothesis → Experiment → Conclusion" },
+
+      // ── UNIT 5: Enlightenment ───────────────────────────────────────
+      { unit: "Unit 5: Enlightenment", term: "Hobbes", def: "Humans are naturally selfish — believed people need a strong government to control them" },
+      { unit: "Unit 5: Enlightenment", term: "Locke", def: "People have natural rights — government must have the consent of the governed" },
+      { unit: "Unit 5: Enlightenment", term: "Rousseau", def: "People are naturally good — society corrupts them" },
+      { unit: "Unit 5: Enlightenment", term: "Montesquieu", def: "Government should have separation of powers to prevent tyranny" },
+      { unit: "Unit 5: Enlightenment", term: "Beccaria", def: "Against torture and cruel punishments" },
+      { unit: "Unit 5: Enlightenment", term: "Adam Smith", def: "Father of capitalism and the free market" },
+      { unit: "Unit 5: Enlightenment", term: "The Social Contract", def: "Agreement between the people and government — people give up some freedom in exchange for protection" },
+
+      // ── UNIT 5: American Revolution ─────────────────────────────────
+      { unit: "Unit 5: American Revolution", term: "Thomas Jefferson", def: "Wrote the Declaration of Independence" },
+      { unit: "Unit 5: American Revolution", term: "Bill of Rights", def: "First 10 amendments to the U.S. Constitution — protected individual freedoms" },
+      { unit: "Unit 5: American Revolution", term: "Causes of the American Revolution", def: "Taxation without representation" },
+      { unit: "Unit 5: American Revolution", term: "King George III", def: "British king who refused to address the colonists' complaints" },
+      { unit: "Unit 5: American Revolution", term: "George Washington", def: "Led the Continental Army and became the first President of the United States" },
+
+      // ── UNIT 5: French Revolution ───────────────────────────────────
+      { unit: "Unit 5: French Revolution", term: "Causes of the French Revolution", def: "Inequality between the estates and France going bankrupt from wars" },
+      { unit: "Unit 5: French Revolution", term: "Estates-General", def: "Meeting of all three estates called by Louis XVI" },
+      { unit: "Unit 5: French Revolution", term: "National Assembly", def: "The Third Estate broke away and formed their own government" },
+      { unit: "Unit 5: French Revolution", term: "Jacobins", def: "Radical revolutionary group that led the Reign of Terror" },
+      { unit: "Unit 5: French Revolution", term: "1st, 2nd, and 3rd Estate", def: "1st: Clergy | 2nd: Nobles | 3rd: Everyone else — who paid all the taxes" },
+      { unit: "Unit 5: French Revolution", term: "Old Regime", def: "The pre-revolution social and political system in France" },
+      { unit: "Unit 5: French Revolution", term: "Deficit Spending", def: "Government spending more money than it earns" },
+      { unit: "Unit 5: French Revolution", term: "King Louis XVI", def: "Weak French king during the Revolution" },
+      { unit: "Unit 5: French Revolution", term: "Marie Antoinette", def: "Queen of France during the Revolution" },
+      { unit: "Unit 5: French Revolution", term: "Robespierre", def: "Led the Reign of Terror — was eventually executed himself" },
+      { unit: "Unit 5: French Revolution", term: "Guillotine", def: "Device used for beheadings during the French Revolution" },
+      { unit: "Unit 5: French Revolution", term: "Reign of Terror", def: "Period during the French Revolution when thousands were executed" },
+      { unit: "Unit 5: French Revolution", term: "Napoleon", def: "Military general who took power after the Revolution — conquered much of Europe and spread French laws and ideas" },
+    ];
+
+    // Build unique unit list (preserving order)
+    const unitOrder = [];
+    ALL_CARDS.forEach(c => { if (!unitOrder.includes(c.unit)) unitOrder.push(c.unit); });
+
+    let activeUnits = new Set(unitOrder); // all active by default
+    let quickSetActive = false;
+    let cards = [];
+    let index = 0;
+    let status = {};
+    let flipped = false;
+
+    // Build filter pills
+    const filtersEl = document.getElementById('filters');
+
+    function buildPills() {
+      filtersEl.innerHTML = '';
+
+      // Quick Set pill
+      const qsPill = document.createElement('div');
+      qsPill.className = 'pill quickset' + (quickSetActive ? ' active' : '');
+      qsPill.textContent = '⭐ Enlightenment Quick Set';
+      qsPill.onclick = () => {
+        quickSetActive = !quickSetActive;
+        if (quickSetActive) activeUnits = new Set(); // deselect units
+        else activeUnits = new Set(unitOrder);
+        refreshPills();
+        applyFilter();
+      };
+      filtersEl.appendChild(qsPill);
+
+      // "All" pill
+      const allPill = document.createElement('div');
+      allPill.className = 'pill' + (!quickSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
+      allPill.textContent = 'All';
+      allPill.onclick = () => {
+        quickSetActive = false;
+        activeUnits = new Set(unitOrder);
+        refreshPills();
+        applyFilter();
+      };
+      filtersEl.appendChild(allPill);
+
+      unitOrder.forEach(u => {
+        const p = document.createElement('div');
+        p.className = 'pill' + (!quickSetActive && activeUnits.has(u) ? ' active' : '');
+        p.textContent = u.replace('Unit ', 'U').replace(': ', ' – ');
+        p.onclick = () => {
+          quickSetActive = false;
+          if (activeUnits.has(u)) {
+            if (activeUnits.size === 1) return;
+            activeUnits.delete(u);
+          } else {
+            activeUnits.add(u);
+          }
+          refreshPills();
+          applyFilter();
+        };
+        filtersEl.appendChild(p);
+      });
+    }
+
+    function refreshPills() {
+      const pills = filtersEl.querySelectorAll('.pill');
+      // Quick set pill (index 0)
+      pills[0].className = 'pill quickset' + (quickSetActive ? ' active' : '');
+      // All pill (index 1)
+      pills[1].className = 'pill' + (!quickSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
+      // Unit pills (index 2+)
+      unitOrder.forEach((u, i) => {
+        pills[i + 2].className = 'pill' + (!quickSetActive && activeUnits.has(u) ? ' active' : '');
+      });
+    }
+
+    function applyFilter() {
+      if (quickSetActive) {
+        cards = [...QUICK_SET];
+      } else {
+        cards = ALL_CARDS.filter(c => activeUnits.has(c.unit));
+      }
+      index = 0;
+      status = {};
+      render();
+    }
+
+    function render() {
+      if (cards.length === 0) return;
+      const card = cards[index];
+      document.getElementById('unitTag').textContent = card.unit;
+      document.getElementById('term').textContent = card.term;
+      document.getElementById('def').textContent = card.def;
+      document.getElementById('counter').textContent = `${index + 1} / ${cards.length}`;
+      document.getElementById('prevBtn').disabled = index === 0;
+      document.getElementById('nextBtn').disabled = index === cards.length - 1;
+
+      flipped = false;
+      document.getElementById('card').classList.remove('flipped');
+      document.getElementById('knowBtns').classList.remove('visible');
+
+      updateScoreDisplay();
+      renderDots();
+    }
+
+    function updateScoreDisplay() {
+      const vals = Object.values(status);
+      document.getElementById('knowCount').textContent = vals.filter(v => v === 'know').length;
+      document.getElementById('learnCount').textContent = vals.filter(v => v === 'learn').length;
+    }
+
+    function renderDots() {
+      const prog = document.getElementById('progress');
+      prog.innerHTML = '';
+      cards.forEach((_, i) => {
+        const d = document.createElement('div');
+        let cls = 'dot';
+        if (i === index) cls += ' current';
+        else if (status[i] === 'know') cls += ' know';
+        else if (status[i] === 'learn') cls += ' learn';
+        d.className = cls;
+        prog.appendChild(d);
+      });
+    }
+
+    function flipCard() {
+      flipped = !flipped;
+      document.getElementById('card').classList.toggle('flipped');
+      if (flipped) document.getElementById('knowBtns').classList.add('visible');
+    }
+
+    function markCard(known) {
+      status[index] = known ? 'know' : 'learn';
+      updateScoreDisplay();
+      renderDots();
+      const next = index + 1;
+      if (next < cards.length) { index = next; render(); }
+      else showDone();
+    }
+
+    function navigate(dir) {
+      const next = index + dir;
+      if (next >= 0 && next < cards.length) { index = next; render(); }
+    }
+
+    function shuffle() {
+      for (let i = cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+      }
+      index = 0;
+      status = {};
+      render();
+    }
+
+    function showDone() {
+      const knowN = Object.values(status).filter(v => v === 'know').length;
+      const learnN = Object.values(status).filter(v => v === 'learn').length;
+      document.getElementById('main').style.display = 'none';
+      document.getElementById('doneScreen').classList.add('visible');
+      document.getElementById('doneStats').innerHTML =
+        `<span style="color:#4ade80">&#10003; Know it: ${knowN}</span><br>` +
+        `<span style="color:#fb923c">&#x2715; Still learning: ${learnN}</span>`;
+      document.querySelector('.study-again-btn').style.display = learnN > 0 ? '' : 'none';
+    }
+
+    function restart(onlyLearning) {
+      document.getElementById('main').style.display = '';
+      document.getElementById('doneScreen').classList.remove('visible');
+      if (onlyLearning) {
+        const learnKeys = Object.keys(status).filter(k => status[k] === 'learn').map(Number);
+        cards = learnKeys.map(k => cards[k]);
+      } else {
+        cards = quickSetActive ? [...QUICK_SET] : ALL_CARDS.filter(c => activeUnits.has(c.unit));
+      }
+      index = 0;
+      status = {};
+      render();
+    }
+
+    buildPills();
+    applyFilter();
+  </script>
+</body>
+</html>
