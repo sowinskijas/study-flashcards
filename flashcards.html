@@ -307,6 +307,118 @@
     }
 
     .study-again-btn:hover { background: #7c2d12; }
+
+    /* Save / Presets buttons */
+    .save-btn {
+      background: transparent;
+      border: 1px solid #22c55e;
+      color: #4ade80;
+      font-size: 0.8rem;
+      padding: 7px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .save-btn:hover { background: #14532d; }
+
+    .presets-btn {
+      background: transparent;
+      border: 1px solid #f59e0b;
+      color: #fbbf24;
+      font-size: 0.8rem;
+      padding: 7px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .presets-btn:hover { background: #1e1a00; }
+
+    /* Auto-save indicator */
+    .save-indicator {
+      font-size: 0.75rem;
+      color: #4ade80;
+      opacity: 0;
+      transition: opacity 0.4s;
+      margin-top: 6px;
+      height: 16px;
+    }
+    .save-indicator.visible { opacity: 1; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.visible { display: flex; }
+
+    .modal {
+      background: #16213e;
+      border: 1px solid #2d2d6b;
+      border-radius: 18px;
+      padding: 28px;
+      width: 100%;
+      max-width: 440px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #a78bfa;
+      margin-bottom: 16px;
+    }
+
+    .preset-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #1a1a2e;
+      border: 1px solid #2d2d50;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+
+    .preset-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 3px;
+    }
+
+    .preset-meta {
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    .preset-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .preset-load-btn {
+      background: #4f46e5;
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+    .preset-load-btn:hover { background: #4338ca; }
+
+    .preset-del-btn {
+      background: #2d2d50;
+      border: none;
+      color: #f87171;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+    .preset-del-btn:hover { background: #3d1a1a; }
   </style>
 </head>
 <body>
@@ -350,16 +462,27 @@
 
     <div class="bottom-btns">
       <button class="shuffle-btn" onclick="shuffle()">&#x1F500; Shuffle</button>
+      <button class="save-btn" onclick="openSaveModal()">&#x1F4BE; Save Preset</button>
+      <button class="presets-btn" onclick="openPresetsModal()">&#x1F4C2; My Presets</button>
     </div>
 
+    <div class="save-indicator" id="saveIndicator">&#x2713; Progress saved</div>
     <div class="progress" id="progress"></div>
   </div>
 
   <div class="done-screen" id="doneScreen">
-    <div class="done-title">Nice work!</div>
+    <div class="done-title">Nice work! &#x1F3AB;</div>
     <div class="done-stats" id="doneStats"></div>
-    <button class="restart-btn" onclick="restart(false)">&#x1F504; Restart all cards</button>
+    <button class="save-btn" style="padding:11px 22px;font-size:0.95rem;" onclick="openSaveModal()">&#x1F4BE; Save Progress as Preset</button>
+    <button class="restart-btn" onclick="restart(false)">&#x1F504; Go back &amp; keep marks</button>
     <button class="study-again-btn" onclick="restart(true)">&#x1F4DA; Study &ldquo;Still learning&rdquo; again</button>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div id="modalContent"></div>
+    </div>
   </div>
 
   <script>
@@ -536,45 +659,134 @@
       { unit: "Unit 5: French Revolution", term: "Napoleon", def: "Military general who took power after the Revolution — conquered much of Europe and spread French laws and ideas" },
     ];
 
-    // Build unique unit list (preserving order)
+    // ── Card identity key (survives shuffle + filter changes) ──────────
+    function cardKey(c) { return c.unit + '|' + c.term; }
+
+    // ── Build unit list ─────────────────────────────────────────────────
     const unitOrder = [];
     ALL_CARDS.forEach(c => { if (!unitOrder.includes(c.unit)) unitOrder.push(c.unit); });
 
-    let activeUnits = new Set(unitOrder); // all active by default
+    // ── State ───────────────────────────────────────────────────────────
+    let globalStatus = {};   // keyed by cardKey — persists across filter changes
+    let activeUnits  = new Set(unitOrder);
     let quickSetActive = false;
-    let cards = [];
-    let index = 0;
-    let status = {};
+    let cards  = [];
+    let index  = 0;
     let flipped = false;
 
-    // Build filter pills
+    // ── LocalStorage ────────────────────────────────────────────────────
+    const LS_AUTO    = 'fc_autosave';
+    const LS_PRESETS = 'fc_presets';
+
+    function autoSave() {
+      localStorage.setItem(LS_AUTO, JSON.stringify({
+        globalStatus,
+        activeUnits: [...activeUnits],
+        quickSetActive,
+        index
+      }));
+      flashSaved();
+    }
+
+    function flashSaved() {
+      const el = document.getElementById('saveIndicator');
+      el.classList.add('visible');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('visible'), 1800);
+    }
+
+    function loadAutoSave() {
+      try {
+        const raw = localStorage.getItem(LS_AUTO);
+        if (!raw) return false;
+        const s = JSON.parse(raw);
+        globalStatus = s.globalStatus || {};
+        if (s.quickSetActive) {
+          quickSetActive = true;
+          activeUnits = new Set();
+        } else {
+          quickSetActive = false;
+          const saved = (s.activeUnits || []).filter(u => unitOrder.includes(u));
+          activeUnits = saved.length ? new Set(saved) : new Set(unitOrder);
+        }
+        const savedIdx = s.index || 0;
+        applyFilter(false);
+        index = Math.min(savedIdx, cards.length - 1);
+        render();
+        return true;
+      } catch(e) { return false; }
+    }
+
+    // ── Presets ─────────────────────────────────────────────────────────
+    function getPresets() {
+      try { return JSON.parse(localStorage.getItem(LS_PRESETS) || '[]'); } catch(e) { return []; }
+    }
+    function savePresets(arr) { localStorage.setItem(LS_PRESETS, JSON.stringify(arr)); }
+
+    function savePreset(name) {
+      const knowN = cards.filter(c => globalStatus[cardKey(c)] === 'know').length;
+      const learnN = cards.filter(c => globalStatus[cardKey(c)] === 'learn').length;
+      const presets = getPresets();
+      presets.unshift({
+        id: Date.now(),
+        name,
+        date: new Date().toLocaleDateString(),
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+        globalStatus: {...globalStatus},
+        activeUnits: [...activeUnits],
+        quickSetActive,
+        index,
+        knowN, learnN,
+        total: cards.length
+      });
+      savePresets(presets);
+    }
+
+    function loadPreset(preset) {
+      globalStatus = {...preset.globalStatus};
+      if (preset.quickSetActive) {
+        quickSetActive = true;
+        activeUnits = new Set();
+      } else {
+        quickSetActive = false;
+        const valid = (preset.activeUnits || []).filter(u => unitOrder.includes(u));
+        activeUnits = valid.length ? new Set(valid) : new Set(unitOrder);
+      }
+      applyFilter(false);
+      index = Math.min(preset.index || 0, cards.length - 1);
+      render();
+      refreshPills();
+      autoSave();
+      closeModal();
+    }
+
+    function deletePreset(id) {
+      savePresets(getPresets().filter(p => p.id !== id));
+      renderPresetsModal();
+    }
+
+    // ── Filter pills ─────────────────────────────────────────────────────
     const filtersEl = document.getElementById('filters');
 
     function buildPills() {
       filtersEl.innerHTML = '';
 
-      // Quick Set pill
       const qsPill = document.createElement('div');
       qsPill.className = 'pill quickset' + (quickSetActive ? ' active' : '');
       qsPill.textContent = '⭐ Enlightenment Quick Set';
       qsPill.onclick = () => {
         quickSetActive = !quickSetActive;
-        if (quickSetActive) activeUnits = new Set(); // deselect units
-        else activeUnits = new Set(unitOrder);
-        refreshPills();
-        applyFilter();
+        activeUnits = quickSetActive ? new Set() : new Set(unitOrder);
+        refreshPills(); applyFilter();
       };
       filtersEl.appendChild(qsPill);
 
-      // "All" pill
       const allPill = document.createElement('div');
       allPill.className = 'pill' + (!quickSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
       allPill.textContent = 'All';
       allPill.onclick = () => {
-        quickSetActive = false;
-        activeUnits = new Set(unitOrder);
-        refreshPills();
-        applyFilter();
+        quickSetActive = false; activeUnits = new Set(unitOrder);
+        refreshPills(); applyFilter();
       };
       filtersEl.appendChild(allPill);
 
@@ -584,14 +796,9 @@
         p.textContent = u.replace('Unit ', 'U').replace(': ', ' – ');
         p.onclick = () => {
           quickSetActive = false;
-          if (activeUnits.has(u)) {
-            if (activeUnits.size === 1) return;
-            activeUnits.delete(u);
-          } else {
-            activeUnits.add(u);
-          }
-          refreshPills();
-          applyFilter();
+          if (activeUnits.has(u)) { if (activeUnits.size === 1) return; activeUnits.delete(u); }
+          else activeUnits.add(u);
+          refreshPills(); applyFilter();
         };
         filtersEl.appendChild(p);
       });
@@ -599,27 +806,25 @@
 
     function refreshPills() {
       const pills = filtersEl.querySelectorAll('.pill');
-      // Quick set pill (index 0)
       pills[0].className = 'pill quickset' + (quickSetActive ? ' active' : '');
-      // All pill (index 1)
       pills[1].className = 'pill' + (!quickSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
-      // Unit pills (index 2+)
       unitOrder.forEach((u, i) => {
         pills[i + 2].className = 'pill' + (!quickSetActive && activeUnits.has(u) ? ' active' : '');
       });
     }
 
-    function applyFilter() {
-      if (quickSetActive) {
-        cards = [...QUICK_SET];
-      } else {
-        cards = ALL_CARDS.filter(c => activeUnits.has(c.unit));
-      }
+    // clearGlobalStatus=true only when explicitly clearing; false preserves marks
+    function applyFilter(clearGlobalStatus = false) {
+      cards = quickSetActive ? [...QUICK_SET] : ALL_CARDS.filter(c => activeUnits.has(c.unit));
+      if (clearGlobalStatus) globalStatus = {};
       index = 0;
-      status = {};
+      // Restore done screen if visible
+      document.getElementById('main').style.display = '';
+      document.getElementById('doneScreen').classList.remove('visible');
       render();
     }
 
+    // ── Card rendering ────────────────────────────────────────────────────
     function render() {
       if (cards.length === 0) return;
       const card = cards[index];
@@ -629,30 +834,30 @@
       document.getElementById('counter').textContent = `${index + 1} / ${cards.length}`;
       document.getElementById('prevBtn').disabled = index === 0;
       document.getElementById('nextBtn').disabled = index === cards.length - 1;
-
       flipped = false;
       document.getElementById('card').classList.remove('flipped');
       document.getElementById('knowBtns').classList.remove('visible');
-
       updateScoreDisplay();
       renderDots();
     }
 
     function updateScoreDisplay() {
-      const vals = Object.values(status);
-      document.getElementById('knowCount').textContent = vals.filter(v => v === 'know').length;
-      document.getElementById('learnCount').textContent = vals.filter(v => v === 'learn').length;
+      const knowN = cards.filter(c => globalStatus[cardKey(c)] === 'know').length;
+      const learnN = cards.filter(c => globalStatus[cardKey(c)] === 'learn').length;
+      document.getElementById('knowCount').textContent = knowN;
+      document.getElementById('learnCount').textContent = learnN;
     }
 
     function renderDots() {
       const prog = document.getElementById('progress');
       prog.innerHTML = '';
-      cards.forEach((_, i) => {
+      cards.forEach((c, i) => {
         const d = document.createElement('div');
+        const st = globalStatus[cardKey(c)];
         let cls = 'dot';
         if (i === index) cls += ' current';
-        else if (status[i] === 'know') cls += ' know';
-        else if (status[i] === 'learn') cls += ' learn';
+        else if (st === 'know') cls += ' know';
+        else if (st === 'learn') cls += ' learn';
         d.className = cls;
         prog.appendChild(d);
       });
@@ -665,7 +870,8 @@
     }
 
     function markCard(known) {
-      status[index] = known ? 'know' : 'learn';
+      globalStatus[cardKey(cards[index])] = known ? 'know' : 'learn';
+      autoSave();
       updateScoreDisplay();
       renderDots();
       const next = index + 1;
@@ -683,14 +889,16 @@
         const j = Math.floor(Math.random() * (i + 1));
         [cards[i], cards[j]] = [cards[j], cards[i]];
       }
-      index = 0;
-      status = {};
+      // Start at first unmarked card, or 0
+      const first = cards.findIndex(c => !globalStatus[cardKey(c)]);
+      index = first >= 0 ? first : 0;
       render();
+      autoSave();
     }
 
     function showDone() {
-      const knowN = Object.values(status).filter(v => v === 'know').length;
-      const learnN = Object.values(status).filter(v => v === 'learn').length;
+      const knowN = cards.filter(c => globalStatus[cardKey(c)] === 'know').length;
+      const learnN = cards.filter(c => globalStatus[cardKey(c)] === 'learn').length;
       document.getElementById('main').style.display = 'none';
       document.getElementById('doneScreen').classList.add('visible');
       document.getElementById('doneStats').innerHTML =
@@ -703,18 +911,89 @@
       document.getElementById('main').style.display = '';
       document.getElementById('doneScreen').classList.remove('visible');
       if (onlyLearning) {
-        const learnKeys = Object.keys(status).filter(k => status[k] === 'learn').map(Number);
-        cards = learnKeys.map(k => cards[k]);
+        // Keep only 'still learning' cards; clear their marks so you re-study them fresh
+        const learnCards = cards.filter(c => globalStatus[cardKey(c)] === 'learn');
+        learnCards.forEach(c => delete globalStatus[cardKey(c)]);
+        cards = learnCards;
       } else {
+        // Restore full set, keep all marks
         cards = quickSetActive ? [...QUICK_SET] : ALL_CARDS.filter(c => activeUnits.has(c.unit));
       }
       index = 0;
-      status = {};
       render();
+      autoSave();
     }
 
+    // ── Modal ─────────────────────────────────────────────────────────────
+    function openSaveModal() {
+      const def = `Session – ${new Date().toLocaleDateString()}`;
+      document.getElementById('modalContent').innerHTML = `
+        <div class="modal-title">&#x1F4BE; Save Progress</div>
+        <p style="font-size:0.85rem;color:#aaa;margin-bottom:14px;">Give this snapshot a name so you can load it later.</p>
+        <input id="presetNameInput" type="text" value="${def}"
+          style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid #4f46e5;background:#1a1a2e;color:#eee;font-size:0.95rem;outline:none;margin-bottom:14px;">
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onclick="closeModal()" style="background:#2d2d50;border:none;color:#aaa;padding:9px 18px;border-radius:9px;cursor:pointer;">Cancel</button>
+          <button onclick="confirmSavePreset()" style="background:#4f46e5;border:none;color:#fff;padding:9px 18px;border-radius:9px;cursor:pointer;font-weight:600;">Save</button>
+        </div>`;
+      document.getElementById('modalOverlay').classList.add('visible');
+      setTimeout(() => document.getElementById('presetNameInput').select(), 60);
+    }
+
+    function confirmSavePreset() {
+      const name = (document.getElementById('presetNameInput').value || '').trim() || 'My Session';
+      savePreset(name);
+      closeModal();
+      flashSaved();
+    }
+
+    function openPresetsModal() {
+      renderPresetsModal();
+      document.getElementById('modalOverlay').classList.add('visible');
+    }
+
+    function renderPresetsModal() {
+      const presets = getPresets();
+      window._presets = presets;
+      let body = presets.length === 0
+        ? `<p style="color:#888;text-align:center;padding:20px 0;">No saved presets yet.<br>Hit <strong>&#x1F4BE; Save Preset</strong> to save your progress.</p>`
+        : presets.map(p => `
+            <div class="preset-item">
+              <div class="preset-info">
+                <div class="preset-name">${p.name}</div>
+                <div class="preset-meta">${p.date} ${p.time||''} &bull; ${p.total} cards &bull; <span style="color:#4ade80">&#10003;${p.knowN}</span> <span style="color:#fb923c">&#x2715;${p.learnN}</span></div>
+              </div>
+              <div class="preset-actions">
+                <button class="preset-load-btn" onclick="loadPreset(window._presets.find(x=>x.id===${p.id}))">Load</button>
+                <button class="preset-del-btn" onclick="deletePreset(${p.id})">&#x1F5D1;</button>
+              </div>
+            </div>`).join('');
+
+      document.getElementById('modalContent').innerHTML = `
+        <div class="modal-title">&#x1F4C2; My Saved Presets</div>
+        ${body}
+        <div style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <button onclick="promptClearMarks()" style="background:#431407;border:1.5px solid #f97316;color:#fb923c;padding:8px 14px;border-radius:9px;cursor:pointer;font-size:0.8rem;">&#x1F5D1; Clear current marks</button>
+          <button onclick="closeModal()" style="background:#2d2d50;border:none;color:#aaa;padding:9px 18px;border-radius:9px;cursor:pointer;">Close</button>
+        </div>`;
+    }
+
+    function promptClearMarks() {
+      if (!confirm('Clear all progress marks for the current card set? Your saved presets will not be affected.')) return;
+      cards.forEach(c => delete globalStatus[cardKey(c)]);
+      index = 0;
+      render();
+      autoSave();
+      closeModal();
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('visible');
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────
     buildPills();
-    applyFilter();
+    if (!loadAutoSave()) applyFilter();
   </script>
 </body>
 </html>
