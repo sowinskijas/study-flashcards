@@ -152,14 +152,12 @@
       opacity: 0.5;
     }
 
-    /* Know / Learn buttons */
+    /* Know / Learn buttons — always visible */
     .know-btns {
-      display: none;
+      display: flex;
       gap: 14px;
       margin-top: 20px;
     }
-
-    .know-btns.visible { display: flex; }
 
     .btn-know {
       background: #14532d;
@@ -424,7 +422,7 @@
 <body>
 
   <h1>Final Exam Review</h1>
-  <p class="subtitle">Click a card to flip &bull; Mark yourself &bull; Study what you need</p>
+  <p class="subtitle">Mark a card anytime &bull; Click to flip and check the definition</p>
 
   <div class="filters" id="filters"></div>
 
@@ -836,7 +834,6 @@
       document.getElementById('nextBtn').disabled = index === cards.length - 1;
       flipped = false;
       document.getElementById('card').classList.remove('flipped');
-      document.getElementById('knowBtns').classList.remove('visible');
       updateScoreDisplay();
       renderDots();
     }
@@ -866,7 +863,6 @@
     function flipCard() {
       flipped = !flipped;
       document.getElementById('card').classList.toggle('flipped');
-      if (flipped) document.getElementById('knowBtns').classList.add('visible');
     }
 
     function markCard(known) {
