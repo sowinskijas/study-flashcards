@@ -74,6 +74,18 @@
       border-color: #fbbf24;
     }
 
+    .pill.peopleset {
+      background: #0d1f2d;
+      color: #67e8f9;
+      border-color: #0891b2;
+    }
+
+    .pill.peopleset.active {
+      background: #164e63;
+      color: #e0f2fe;
+      border-color: #67e8f9;
+    }
+
     /* Card */
     .card-container {
       perspective: 1200px;
@@ -660,6 +672,34 @@
     // ── Card identity key (survives shuffle + filter changes) ──────────
     function cardKey(c) { return c.unit + '|' + c.term; }
 
+    // ── People preset — terms that are about specific historical figures ─
+    const PEOPLE_TERMS = new Set([
+      // Romans / Byzantine / Russia
+      "Constantine's role with Christianity", "Justinian",
+      "Vladimir's role in Russia", "Ivan III",
+      // Middle Ages
+      "Pope Gregory I", "Pope Leo III", "Clovis", "King Henry II",
+      "William the Conqueror", "Joan of Arc", "John Wycliffe",
+      "Who called for the Crusades?",
+      // Renaissance
+      "Erasmus", "Leonardo da Vinci's works", "Michelangelo's works",
+      "Raphael's works", "Shakespeare", "Johann Gutenberg",
+      // Reformation
+      "Martin Luther", "John Calvin",
+      // Exploration
+      "Hernán Cortés", "Francisco Pizarro", "Montezuma II", "Atahualpa",
+      // Absolutism
+      "Louis XIV", "Elizabeth I", "Peter the Great", "Philip II",
+      // Scientific Revolution
+      "Francis Bacon", "René Descartes", "Isaac Newton", "Galileo", "Copernicus",
+      // Enlightenment
+      "Hobbes", "Locke", "Rousseau", "Montesquieu", "Beccaria", "Adam Smith",
+      // American Revolution
+      "Thomas Jefferson", "King George III", "George Washington",
+      // French Revolution
+      "King Louis XVI", "Marie Antoinette", "Robespierre", "Napoleon",
+    ]);
+
     // ── Build unit list ─────────────────────────────────────────────────
     const unitOrder = [];
     ALL_CARDS.forEach(c => { if (!unitOrder.includes(c.unit)) unitOrder.push(c.unit); });
@@ -668,6 +708,7 @@
     let globalStatus = {};   // keyed by cardKey — persists across filter changes
     let activeUnits  = new Set(unitOrder);
     let quickSetActive = false;
+    let peopleSetActive = false;
     let cards  = [];
     let index  = 0;
     let flipped = false;
@@ -681,6 +722,7 @@
         globalStatus,
         activeUnits: [...activeUnits],
         quickSetActive,
+        peopleSetActive,
         index
       }));
       flashSaved();
@@ -699,11 +741,14 @@
         if (!raw) return false;
         const s = JSON.parse(raw);
         globalStatus = s.globalStatus || {};
+        quickSetActive = false; peopleSetActive = false;
         if (s.quickSetActive) {
           quickSetActive = true;
           activeUnits = new Set();
+        } else if (s.peopleSetActive) {
+          peopleSetActive = true;
+          activeUnits = new Set();
         } else {
-          quickSetActive = false;
           const saved = (s.activeUnits || []).filter(u => unitOrder.includes(u));
           activeUnits = saved.length ? new Set(saved) : new Set(unitOrder);
         }
@@ -733,6 +778,7 @@
         globalStatus: {...globalStatus},
         activeUnits: [...activeUnits],
         quickSetActive,
+        peopleSetActive,
         index,
         knowN, learnN,
         total: cards.length
@@ -742,11 +788,14 @@
 
     function loadPreset(preset) {
       globalStatus = {...preset.globalStatus};
+      quickSetActive = false; peopleSetActive = false;
       if (preset.quickSetActive) {
         quickSetActive = true;
         activeUnits = new Set();
+      } else if (preset.peopleSetActive) {
+        peopleSetActive = true;
+        activeUnits = new Set();
       } else {
-        quickSetActive = false;
         const valid = (preset.activeUnits || []).filter(u => unitOrder.includes(u));
         activeUnits = valid.length ? new Set(valid) : new Set(unitOrder);
       }
@@ -769,31 +818,45 @@
     function buildPills() {
       filtersEl.innerHTML = '';
 
+      // ⭐ Enlightenment Quick Set
       const qsPill = document.createElement('div');
       qsPill.className = 'pill quickset' + (quickSetActive ? ' active' : '');
       qsPill.textContent = '⭐ Enlightenment Quick Set';
       qsPill.onclick = () => {
-        quickSetActive = !quickSetActive;
+        quickSetActive = !quickSetActive; peopleSetActive = false;
         activeUnits = quickSetActive ? new Set() : new Set(unitOrder);
         refreshPills(); applyFilter();
       };
       filtersEl.appendChild(qsPill);
 
+      // 👤 People
+      const ppPill = document.createElement('div');
+      ppPill.className = 'pill peopleset' + (peopleSetActive ? ' active' : '');
+      ppPill.textContent = '👤 People';
+      ppPill.onclick = () => {
+        peopleSetActive = !peopleSetActive; quickSetActive = false;
+        activeUnits = peopleSetActive ? new Set() : new Set(unitOrder);
+        refreshPills(); applyFilter();
+      };
+      filtersEl.appendChild(ppPill);
+
+      // All
       const allPill = document.createElement('div');
-      allPill.className = 'pill' + (!quickSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
+      allPill.className = 'pill' + (!quickSetActive && !peopleSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
       allPill.textContent = 'All';
       allPill.onclick = () => {
-        quickSetActive = false; activeUnits = new Set(unitOrder);
+        quickSetActive = false; peopleSetActive = false;
+        activeUnits = new Set(unitOrder);
         refreshPills(); applyFilter();
       };
       filtersEl.appendChild(allPill);
 
       unitOrder.forEach(u => {
         const p = document.createElement('div');
-        p.className = 'pill' + (!quickSetActive && activeUnits.has(u) ? ' active' : '');
+        p.className = 'pill' + (!quickSetActive && !peopleSetActive && activeUnits.has(u) ? ' active' : '');
         p.textContent = u.replace('Unit ', 'U').replace(': ', ' – ');
         p.onclick = () => {
-          quickSetActive = false;
+          quickSetActive = false; peopleSetActive = false;
           if (activeUnits.has(u)) { if (activeUnits.size === 1) return; activeUnits.delete(u); }
           else activeUnits.add(u);
           refreshPills(); applyFilter();
@@ -805,15 +868,18 @@
     function refreshPills() {
       const pills = filtersEl.querySelectorAll('.pill');
       pills[0].className = 'pill quickset' + (quickSetActive ? ' active' : '');
-      pills[1].className = 'pill' + (!quickSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
+      pills[1].className = 'pill peopleset' + (peopleSetActive ? ' active' : '');
+      pills[2].className = 'pill' + (!quickSetActive && !peopleSetActive && activeUnits.size === unitOrder.length ? ' active' : '');
       unitOrder.forEach((u, i) => {
-        pills[i + 2].className = 'pill' + (!quickSetActive && activeUnits.has(u) ? ' active' : '');
+        pills[i + 3].className = 'pill' + (!quickSetActive && !peopleSetActive && activeUnits.has(u) ? ' active' : '');
       });
     }
 
     // clearGlobalStatus=true only when explicitly clearing; false preserves marks
     function applyFilter(clearGlobalStatus = false) {
-      cards = quickSetActive ? [...QUICK_SET] : ALL_CARDS.filter(c => activeUnits.has(c.unit));
+      if (quickSetActive) cards = [...QUICK_SET];
+      else if (peopleSetActive) cards = ALL_CARDS.filter(c => PEOPLE_TERMS.has(c.term));
+      else cards = ALL_CARDS.filter(c => activeUnits.has(c.unit));
       if (clearGlobalStatus) globalStatus = {};
       index = 0;
       // Restore done screen if visible
@@ -913,7 +979,9 @@
         cards = learnCards;
       } else {
         // Restore full set, keep all marks
-        cards = quickSetActive ? [...QUICK_SET] : ALL_CARDS.filter(c => activeUnits.has(c.unit));
+        if (quickSetActive) cards = [...QUICK_SET];
+        else if (peopleSetActive) cards = ALL_CARDS.filter(c => PEOPLE_TERMS.has(c.term));
+        else cards = ALL_CARDS.filter(c => activeUnits.has(c.unit));
       }
       index = 0;
       render();
